@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Security Check</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f4f4f9; margin: 0; }
+        .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; min-width: 300px; }
+        .logo { width: 75px; margin-bottom: 1rem; }
+        .hidden { display: none; }
+        .success-text { color: #27ae60; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img src="/logo.png" alt="Logo" class="logo">
+        <div id="challenge-container">
+            <h2>Verifying your connection</h2>
+            <div id="status">Analyzing...</div>
+        </div>
+        <div id="success-container" class="hidden">
+            <h2 class="success-text">✓ Verification Successful</h2>
+            <p>Redirecting you now...</p>
+        </div>
+    </div>
+    <script>
+        async function solveChallenge() {
+            if (!window.isSecureContext) {
+                document.getElementById('status').innerText = "❌ HTTPS Required.";
+                return;
+            }
+            const difficulty = 4; 
+            const host = window.location.hostname;
+            const ts = Math.floor(Date.now() / 1000);
+            const target = '0'.repeat(difficulty);
+            let tries = 0;
+
+            while (true) {
+                const input = `${host};${ts};${tries}`;
+                const buf = new TextEncoder().encode(input);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', buf);
+                const hash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                
+                if (hash.startsWith(target)) {
+                    const params = new URLSearchParams();
+                    params.append('ts', ts);
+                    params.append('tries', tries);
+                    
+                    const r = await fetch('/_challenge', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: params 
+                    });
+
+                    if (r.ok) {
+                        document.getElementById('challenge-container').classList.add('hidden');
+                        document.getElementById('success-container').classList.remove('hidden');
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        document.getElementById('status').innerText = "❌ Verification Failed.";
+                    }
+                    break;
+                }
+                tries++;
+                if (tries % 1000 === 0) {
+                    await new Promise(r => setTimeout(r, 1));
+                }
+            }
+        }
+        solveChallenge();
+    </script>
+</body>
+</html>
