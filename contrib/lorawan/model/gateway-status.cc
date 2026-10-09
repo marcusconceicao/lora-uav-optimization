@@ -1,132 +1,126 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Davide Magrin <magrinda@dei.unipd.it>
  */
 
-#include "ns3/gateway-status.h"
-#include "ns3/log.h"
+#include "gateway-status.h"
 
-namespace ns3 {
-namespace lorawan {
+#include "gateway-lorawan-mac.h"
 
-NS_LOG_COMPONENT_DEFINE ("GatewayStatus");
+#include "ns3/simulator.h"
+
+namespace ns3
+{
+namespace lorawan
+{
+
+NS_LOG_COMPONENT_DEFINE("GatewayStatus");
 
 TypeId
-GatewayStatus::GetTypeId (void)
+GatewayStatus::GetTypeId()
 {
-  static TypeId tid = TypeId ("ns3::GatewayStatus")
-    .AddConstructor<GatewayStatus> ()
-    .SetGroupName ("lorawan");
-  return tid;
+    static TypeId tid = TypeId("ns3::GatewayStatus")
+                            .SetParent<Object>()
+                            .AddConstructor<GatewayStatus>()
+                            .SetGroupName("lorawan");
+    return tid;
 }
 
-
-GatewayStatus::GatewayStatus ()
+GatewayStatus::GatewayStatus()
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 }
 
-GatewayStatus::~GatewayStatus ()
+GatewayStatus::~GatewayStatus()
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 }
 
-GatewayStatus::GatewayStatus (Address address, Ptr<NetDevice> netDevice,
-                              Ptr<GatewayLorawanMac> gwMac) :
-  m_address (address),
-  m_netDevice (netDevice),
-  m_gatewayMac (gwMac),
-  m_nextTransmissionTime (Seconds (0))
+GatewayStatus::GatewayStatus(Address address,
+                             Ptr<NetDevice> netDevice,
+                             Ptr<GatewayLorawanMac> gwMac)
+    : m_address(address),
+      m_netDevice(netDevice),
+      m_gatewayMac(gwMac),
+      m_nextTransmissionTime(Time(0))
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 }
 
 Address
-GatewayStatus::GetAddress ()
+GatewayStatus::GetAddress()
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return m_address;
+    return m_address;
 }
 
 void
-GatewayStatus::SetAddress (Address address)
+GatewayStatus::SetAddress(Address address)
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  m_address = address;
+    m_address = address;
 }
 
 Ptr<NetDevice>
-GatewayStatus::GetNetDevice ()
+GatewayStatus::GetNetDevice()
 {
-  return m_netDevice;
+    return m_netDevice;
 }
 
 void
-GatewayStatus::SetNetDevice (Ptr<NetDevice> netDevice)
+GatewayStatus::SetNetDevice(Ptr<NetDevice> netDevice)
 {
-  m_netDevice = netDevice;
+    m_netDevice = netDevice;
 }
 
 Ptr<GatewayLorawanMac>
-GatewayStatus::GetGatewayMac (void)
+GatewayStatus::GetGatewayMac()
 {
-  return m_gatewayMac;
+    return m_gatewayMac;
 }
 
 bool
-GatewayStatus::IsAvailableForTransmission (double frequency)
+GatewayStatus::IsAvailableForTransmission(uint32_t frequencyHz)
 {
-  // We can't send multiple packets at once, see SX1301 V2.01 page 29
+    // We can't send multiple packets at once, see SX1301 V2.01 page 29
 
-  // Check that the gateway was not already "booked"
-  if (m_nextTransmissionTime > Simulator::Now () - MilliSeconds (1))
+    // Check that the gateway was not already "booked"
+    if (m_nextTransmissionTime > Now() - MilliSeconds(1))
     {
-      NS_LOG_INFO ("This gateway is already booked for a transmission");
-      return false;
+        NS_LOG_INFO("This gateway is already booked for a transmission");
+        return false;
     }
 
-  // Check that the gateway is not already in TX mode
-  if (m_gatewayMac->IsTransmitting ())
+    // Check that the gateway is not already in TX mode
+    if (m_gatewayMac->IsTransmitting())
     {
-      NS_LOG_INFO ("This gateway is currently transmitting");
-      return false;
+        NS_LOG_INFO("This gateway is currently transmitting");
+        return false;
     }
 
-  // Check that the gateway is not constrained by the duty cycle
-  Time waitingTime = m_gatewayMac->GetWaitingTime (frequency);
-  if (waitingTime > Seconds (0))
+    // Check that the gateway is not constrained by the duty cycle
+    Time waitTime = m_gatewayMac->GetWaitTime(frequencyHz);
+    if (waitTime.IsStrictlyPositive())
     {
-      NS_LOG_INFO ("Gateway cannot be used because of duty cycle");
-      NS_LOG_INFO ("Waiting time at current GW: " << waitingTime.GetSeconds ()
-                                                  << " seconds");
+        NS_LOG_INFO("Gateway cannot be used because of duty cycle");
+        NS_LOG_INFO("Wait time at current gateway: " << waitTime.As(Time::S));
 
-      return false;
+        return false;
     }
 
-  return true;
+    return true;
 }
 
 void
-GatewayStatus::SetNextTransmissionTime (Time nextTransmissionTime)
+GatewayStatus::SetNextTransmissionTime(Time nextTransmissionTime)
 {
-  m_nextTransmissionTime = nextTransmissionTime;
+    m_nextTransmissionTime = nextTransmissionTime;
 }
-}
-}
+
+} // namespace lorawan
+} // namespace ns3

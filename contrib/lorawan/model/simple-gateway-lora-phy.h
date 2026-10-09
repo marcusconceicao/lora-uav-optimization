@@ -1,19 +1,7 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Davide Magrin <magrinda@dei.unipd.it>
  */
@@ -21,44 +9,51 @@
 #ifndef SIMPLE_GATEWAY_LORA_PHY_H
 #define SIMPLE_GATEWAY_LORA_PHY_H
 
-#include "ns3/object.h"
-#include "ns3/net-device.h"
-#include "ns3/nstime.h"
-#include "ns3/mobility-model.h"
-#include "ns3/node.h"
-#include "ns3/gateway-lora-phy.h"
-#include "ns3/traced-value.h"
-#include <list>
+#include "gateway-lora-phy.h"
 
-namespace ns3 {
-namespace lorawan {
-
-class LoraChannel;
+namespace ns3
+{
+namespace lorawan
+{
 
 /**
+ * @ingroup lorawan
+ *
  * Class modeling a Lora SX1301 chip.
  */
 class SimpleGatewayLoraPhy : public GatewayLoraPhy
 {
-public:
-  static TypeId GetTypeId (void);
+  public:
+    /**
+     *  Register this type.
+     *  @return The object TypeId.
+     */
+    static TypeId GetTypeId();
 
-  SimpleGatewayLoraPhy ();
-  virtual ~SimpleGatewayLoraPhy ();
+    SimpleGatewayLoraPhy();           //!< Default constructor
+    ~SimpleGatewayLoraPhy() override; //!< Destructor
 
-  virtual void StartReceive (Ptr<Packet> packet, double rxPowerDbm, uint8_t sf,
-                             Time duration, double frequencyMHz);
+    // Implementation of GatewayLoraPhy's pure virtual function
+    void Send(Ptr<Packet> packet,
+              uint32_t frequencyHz,
+              IQPolarity iqPolarity,
+              const LoraTxParameters& txParams,
+              double txPowerDbm) override;
 
-  virtual void EndReceive (Ptr<Packet> packet,
-                           Ptr<LoraInterferenceHelper::Event> event);
+    // Implementation of GatewayLoraPhy's pure virtual function
+    void StartReceive(Ptr<Packet> packet,
+                      uint32_t frequencyHz,
+                      IQPolarity iqPolarity,
+                      uint8_t spreadingFactor,
+                      double rxPowerDbm,
+                      Time duration) override;
 
-  virtual void Send (Ptr<Packet> packet, LoraTxParameters txParams,
-                     double frequencyMHz, double txPowerDbm);
-
-private:
+  private:
+    // Implementation of GatewayLoraPhy's pure virtual function
+    void EndReceive(Ptr<Packet> packet, Ptr<LoraInterferenceHelper::Event> event) override;
 };
 
-} /* namespace ns3 */
+} // namespace lorawan
+} // namespace ns3
 
-}
 #endif /* SIMPLE_GATEWAY_LORA_PHY_H */

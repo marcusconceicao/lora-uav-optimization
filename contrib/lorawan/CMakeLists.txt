@@ -36,9 +36,8 @@ set(source_files
     model/lora-tx-current-model.cc
     model/lora-utils.cc
     model/adr-component.cc
-    model/noAdr-component.cc
     model/hex-grid-position-allocator.cc
-        helper/lora-radio-energy-model-helper.cc
+    helper/lora-radio-energy-model-helper.cc
     helper/lora-helper.cc
     helper/lora-phy-helper.cc
     helper/lorawan-mac-helper.cc
@@ -87,9 +86,8 @@ set(header_files
     model/lora-tx-current-model.h
     model/lora-utils.h
     model/adr-component.h
-    model/noAdr-component.h
     model/hex-grid-position-allocator.h
-        helper/lora-radio-energy-model-helper.h
+    helper/lora-radio-energy-model-helper.h
     helper/lora-helper.h
     helper/lora-phy-helper.h
     helper/lorawan-mac-helper.h
@@ -98,7 +96,6 @@ set(header_files
     helper/forwarder-helper.h
     helper/network-server-helper.h
     helper/lora-packet-tracker.h
-    test/utilities.h
 )
 
 build_lib(
@@ -106,12 +103,9 @@ build_lib(
   SOURCE_FILES ${source_files}
   HEADER_FILES ${header_files}
   LIBRARIES_TO_LINK
-    ${libnetwork}
-    ${libpropagation}
     ${libenergy}
     ${libpoint-to-point}
     ${libbuildings}
-    ${libmobility}
   TEST_SOURCES
     test/utilities.cc
     test/lorawan-test-suite.cc

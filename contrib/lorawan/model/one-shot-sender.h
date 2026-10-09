@@ -1,19 +1,7 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Davide Magrin <magrinda@dei.unipd.it>
  */
@@ -22,60 +10,67 @@
 #define ONE_SHOT_SENDER_H
 
 #include "ns3/application.h"
-#include "ns3/nstime.h"
-#include "ns3/lorawan-mac.h"
-#include "ns3/attribute.h"
 
-namespace ns3 {
-namespace lorawan {
+namespace ns3
+{
+namespace lorawan
+{
 
+class LorawanMac;
+
+/**
+ * @ingroup lorawan
+ *
+ * Packet sender application to send a single packet
+ */
 class OneShotSender : public Application
 {
-public:
-  OneShotSender ();
-  OneShotSender (Time sendTime);
-  ~OneShotSender ();
+  public:
+    OneShotSender();           //!< Default constructor
+    ~OneShotSender() override; //!< Destructor
 
-  static TypeId GetTypeId (void);
+    /**
+     * Construct a new OneShotSender object with provided send time.
+     *
+     * @param sendTime The Time of sending.
+     */
+    OneShotSender(Time sendTime);
 
-  /**
-   * Send a packet using the LoraNetDevice's Send method.
-   */
-  void SendPacket (void);
+    /**
+     *  Register this type.
+     *  @return The object TypeId.
+     */
+    static TypeId GetTypeId();
 
-  /**
-   * Set the time at which this app will send a packet.
-   */
-  void SetSendTime (Time sendTime);
+    /**
+     * Send a packet using the LoraNetDevice's Send method.
+     */
+    void SendPacket();
 
-  /**
-   * Start the application by scheduling the first SendPacket event.
-   */
-  void StartApplication (void);
+    /**
+     * Set the time at which this app will send a packet.
+     *
+     * @param sendTime The Time of sending.
+     */
+    void SetSendTime(Time sendTime);
 
-  /**
-   * Stop the application.
-   */
-  void StopApplication (void);
+    /**
+     * Start the application by scheduling the first SendPacket event.
+     */
+    void StartApplication() override;
 
-private:
-  /**
-   * The time at which to send the packet.
-   */
-  Time m_sendTime;
+    /**
+     * Stop the application.
+     */
+    void StopApplication() override;
 
-  /**
-   * The sending event.
-   */
-  EventId m_sendEvent;
-
-  /**
-   * The MAC layer of this node.
-   */
-  Ptr<LorawanMac> m_mac;
+  private:
+    Time m_sendTime;       //!< The time at which to send the packet.
+    EventId m_sendEvent;   //!< The sending event.
+    Ptr<LorawanMac> m_mac; //!< The MAC layer of this node.
 };
 
-} //namespace ns3
+} // namespace lorawan
+} // namespace ns3
 
-}
 #endif /* ONE_SHOT_APPLICATION */

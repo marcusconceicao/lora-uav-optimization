@@ -1,159 +1,154 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Davide Magrin <magrinda@dei.unipd.it>
  */
 
-#include "ns3/gateway-lorawan-mac.h"
-#include "ns3/lorawan-mac-header.h"
-#include "ns3/lora-net-device.h"
-#include "ns3/lora-frame-header.h"
-#include "ns3/log.h"
+#include "gateway-lorawan-mac.h"
 
-namespace ns3 {
-namespace lorawan {
+#include "lora-net-device.h"
+#include "lora-phy.h"
+#include "lora-tag.h"
+#include "lorawan-mac-header.h"
 
-NS_LOG_COMPONENT_DEFINE ("GatewayLorawanMac");
+namespace ns3
+{
+namespace lorawan
+{
 
-NS_OBJECT_ENSURE_REGISTERED (GatewayLorawanMac);
+NS_LOG_COMPONENT_DEFINE("GatewayLorawanMac");
+
+NS_OBJECT_ENSURE_REGISTERED(GatewayLorawanMac);
 
 TypeId
-GatewayLorawanMac::GetTypeId (void)
+GatewayLorawanMac::GetTypeId()
 {
-  static TypeId tid = TypeId ("ns3::GatewayLorawanMac")
-    .SetParent<LorawanMac> ()
-    .AddConstructor<GatewayLorawanMac> ()
-    .SetGroupName ("lorawan");
-  return tid;
+    static TypeId tid = TypeId("ns3::GatewayLorawanMac")
+                            .SetParent<LorawanMac>()
+                            .AddConstructor<GatewayLorawanMac>()
+                            .SetGroupName("lorawan");
+    return tid;
 }
 
-GatewayLorawanMac::GatewayLorawanMac ()
+GatewayLorawanMac::GatewayLorawanMac()
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 }
 
-GatewayLorawanMac::~GatewayLorawanMac ()
+GatewayLorawanMac::~GatewayLorawanMac()
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 }
 
 void
-GatewayLorawanMac::Send (Ptr<Packet> packet)
+GatewayLorawanMac::Send(Ptr<Packet> packet)
 {
-  NS_LOG_FUNCTION (this << packet);
+    NS_LOG_FUNCTION(this << packet);
 
-  // Get DataRate to send this packet with
-  LoraTag tag;
-  packet->RemovePacketTag (tag);
-  uint8_t dataRate = tag.GetDataRate ();
-  double frequency = tag.GetFrequency ();
-  NS_LOG_DEBUG ("DR: " << unsigned (dataRate));
-  NS_LOG_DEBUG ("SF: " << unsigned (GetSfFromDataRate (dataRate)));
-  NS_LOG_DEBUG ("BW: " << GetBandwidthFromDataRate (dataRate));
-  NS_LOG_DEBUG ("Freq: " << frequency << " MHz");
-  packet->AddPacketTag (tag);
+    // Get data rate to send this packet with
+    LoraTag tag;
+    packet->RemovePacketTag(tag);
+    uint8_t dataRate = tag.GetDataRate();
+    uint32_t frequencyHz = tag.GetFrequency();
+    NS_LOG_DEBUG("DR: " << unsigned(dataRate));
+    NS_LOG_DEBUG("SF: " << unsigned(GetSfFromDataRate(dataRate)));
+    NS_LOG_DEBUG("BW: " << GetBandwidthFromDataRate(dataRate));
+    NS_LOG_DEBUG("Freq: " << frequencyHz << " Hz");
+    packet->AddPacketTag(tag);
 
-  // Make sure we can transmit this packet
-  if (m_channelHelper.GetWaitingTime(CreateObject<LogicalLoraChannel> (frequency)) > Time(0))
+    // Make sure we can transmit this packet
+    if (GetWaitTime(frequencyHz).IsStrictlyPositive())
     {
-      // We cannot send now!
-      NS_LOG_WARN ("Trying to send a packet but Duty Cycle won't allow it. Aborting.");
-      return;
+        // We cannot send now!
+        NS_LOG_WARN("Trying to send a packet but Duty Cycle won't allow it. Aborting.");
+        return;
     }
 
-  LoraTxParameters params;
-  params.sf = GetSfFromDataRate (dataRate);
-  params.headerDisabled = false;
-  params.codingRate = 1;
-  params.bandwidthHz = GetBandwidthFromDataRate (dataRate);
-  params.nPreamble = 8;
-  params.crcEnabled = 1;
-  params.lowDataRateOptimizationEnabled = LoraPhy::GetTSym (params) > MilliSeconds (16) ? true : false;
+    auto sf = GetSfFromDataRate(dataRate);
+    auto bw = GetBandwidthFromDataRate(dataRate);
+    // see SX1272/73 Datasheet, Section 4.1.1.6, Rev. 4, Jan. 2019
+    auto ldro = bool((sf == 11 || sf == 12) && bw == 125'000);
 
-  // Get the duration
-  Time duration = m_phy->GetOnAirTime (packet, params);
+    LoraTxParameters params;
+    params.spreadingFactor = sf;
+    params.bandwidthHz = bw;
+    params.codingRate = CodingRate::CR_4_5;
+    params.lowDataRateOptimize = ldro;
+    params.preambleLenSymb = 8;
+    params.implicitHeader = false;
+    params.crcEnabled = true;
 
-  NS_LOG_DEBUG ("Duration: " << duration.GetSeconds ());
+    // Get the duration
+    Time duration = LoraPhy::GetTimeOnAir(packet->GetSize(), params);
 
-  // Find the channel with the desired frequency
-  double sendingPower = m_channelHelper.GetTxPowerForChannel
-      (CreateObject<LogicalLoraChannel> (frequency));
+    NS_LOG_DEBUG("Duration: " << duration.As(Time::S));
 
-  // Add the event to the channelHelper to keep track of duty cycle
-  m_channelHelper.AddEvent (duration, CreateObject<LogicalLoraChannel>
-                              (frequency));
+    // Find the channel with the desired frequency
+    double sendingPower = m_channelHelper->GetTxPowerForChannel(frequencyHz);
 
-  // Send the packet to the PHY layer to send it on the channel
-  m_phy->Send (packet, params, frequency, sendingPower);
+    // Add the event to the channelHelper to keep track of duty cycle
+    m_channelHelper->AddEvent(duration, frequencyHz);
 
-  m_sentNewPacket (packet);
+    // Send the packet to the PHY layer to send it on the channel
+    m_phy->Send(packet, frequencyHz, IQPolarity::DOWN, params, sendingPower);
+
+    m_sentNewPacket(packet);
 }
 
 bool
-GatewayLorawanMac::IsTransmitting (void)
+GatewayLorawanMac::IsTransmitting()
 {
-  return m_phy->IsTransmitting ();
-}
-
-void
-GatewayLorawanMac::Receive (Ptr<Packet const> packet)
-{
-  NS_LOG_FUNCTION (this << packet);
-
-  // Make a copy of the packet to work on
-  Ptr<Packet> packetCopy = packet->Copy ();
-
-  // Only forward the packet if it's uplink
-  LorawanMacHeader macHdr;
-  packetCopy->PeekHeader (macHdr);
-
-  if (macHdr.IsUplink ())
-    {
-      m_device->GetObject<LoraNetDevice> ()->Receive (packetCopy);
-
-      NS_LOG_DEBUG ("Received packet: " << packet);
-
-      m_receivedPacket (packet);
-    }
-  else
-    {
-      NS_LOG_DEBUG ("Not forwarding downlink message to NetDevice");
-    }
-}
-
-void
-GatewayLorawanMac::FailedReception (Ptr<Packet const> packet)
-{
-  NS_LOG_FUNCTION (this << packet);
-}
-
-void
-GatewayLorawanMac::TxFinished (Ptr<const Packet> packet)
-{
-  NS_LOG_FUNCTION_NOARGS ();
+    return m_phy->IsTransmitting();
 }
 
 Time
-GatewayLorawanMac::GetWaitingTime (double frequency)
+GatewayLorawanMac::GetWaitTime(uint32_t frequencyHz)
 {
-  NS_LOG_FUNCTION_NOARGS ();
+    NS_LOG_FUNCTION_NOARGS();
+    return m_channelHelper->GetWaitTime(frequencyHz);
+}
 
-  return m_channelHelper.GetWaitingTime (CreateObject<LogicalLoraChannel>
-                                           (frequency));
+void
+GatewayLorawanMac::TxFinished(Ptr<const Packet> packet)
+{
+    NS_LOG_FUNCTION(this << packet);
 }
+
+void
+GatewayLorawanMac::Receive(Ptr<const Packet> packet)
+{
+    NS_LOG_FUNCTION(this << packet);
+
+    // Make a copy of the packet to work on
+    Ptr<Packet> packetCopy = packet->Copy();
+
+    // Only forward the packet if it's uplink
+    LorawanMacHeader macHdr;
+    packetCopy->PeekHeader(macHdr);
+
+    if (macHdr.IsUplink())
+    {
+        NS_LOG_DEBUG("Received packet: " << packet);
+        // Pass the packet up to the NetDevice
+        if (!m_receiveCallback.IsNull())
+        {
+            m_receiveCallback(packetCopy);
+        }
+        m_receivedPacket(packet);
+    }
+    else
+    {
+        NS_LOG_DEBUG("Not forwarding downlink message to NetDevice");
+    }
 }
+
+void
+GatewayLorawanMac::FailedReception(Ptr<const Packet> packet)
+{
+    NS_LOG_FUNCTION(this << packet);
 }
+
+} // namespace lorawan
+} // namespace ns3

@@ -1,41 +1,35 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Davide Magrin <magrinda@dei.unipd.it>
- * Adapted: Rogério S Silva <rogeriosousa@discente.ufg.br>
- * Changes: add LoRa slice identification: m_slice_id.
  */
 
 #ifndef LORA_NET_DEVICE_H
 #define LORA_NET_DEVICE_H
 
 #include "ns3/net-device.h"
-#include "ns3/lora-channel.h"
-#include "ns3/lora-phy.h"
-#include "ns3/lorawan-mac.h"
 
-namespace ns3 {
-namespace lorawan {
+namespace ns3
+{
+namespace lorawan
+{
+
+/**
+ * @defgroup lorawan LoRaWAN Models
+ *
+ * This section documents the API of the ns-3 lorawan module. For a generic functional description,
+ * please refer to the ns-3 manual.
+ */
 
 class LoraChannel;
 class LoraPhy;
 class LorawanMac;
 
 /**
+ * @ingroup lorawan
+ *
  * Hold together all LoRa related objects.
  *
  * This class holds together pointers to LoraChannel, LoraPhy and LorawanMac,
@@ -45,151 +39,137 @@ class LorawanMac;
  */
 class LoraNetDevice : public NetDevice
 {
-public:
-  static TypeId GetTypeId (void);
+  public:
+    /**
+     *  Register this type.
+     *  @return The object TypeId.
+     */
+    static TypeId GetTypeId();
 
-  // Slice type enumeration
-  enum SliceType { URA_SLICE, RA_SLICE, BE_SLICE };
+    LoraNetDevice();           //!< Default constructor
+    ~LoraNetDevice() override; //!< Destructor
 
-  // Constructor and destructor
-  LoraNetDevice ();
-  virtual ~LoraNetDevice ();
+    /**
+     * Set which LorawanMac instance is linked to this device.
+     *
+     * @param mac The MAC layer to use.
+     */
+    void SetMac(Ptr<LorawanMac> mac);
 
-  /**
-   * Set which LorawanMac instance is linked to this device.
-   *
-   * \param mac the mac layer to use.
-   */
-  void SetMac (Ptr<LorawanMac> mac);
+    /**
+     * Set which LoraPhy instance is linked to this device.
+     *
+     * @param phy The PHY layer to use.
+     */
+    void SetPhy(Ptr<LoraPhy> phy);
 
-  /**
-   * Set which LoraPhy instance is linked to this device.
-   *
-   * \param phy the phy layer to use.
-   */
-  void SetPhy (Ptr<LoraPhy> phy);
+    /**
+     * Get the LorawanMac instance that is linked to this NetDevice.
+     *
+     * @return The MAC we are currently using.
+     */
+    Ptr<LorawanMac> GetMac() const;
 
-  /**
-   * Set which slice on the gateway this this device is linked to.
-   *
-   * \param slice identification to use.
-   */
-  void SetSlice (uint8_t slice);
+    /**
+     * Get the LoraPhy instance that is linked to this NetDevice.
+     *
+     * @return The PHY we are currently using.
+     */
+    Ptr<LoraPhy> GetPhy() const;
 
-  /**
-   * Get the LorawanMac instance that is linked to this NetDevice.
-   *
-   * \return the mac we are currently using.
-   */
+    /**
+     * Send a packet through the LoRaWAN stack.
+     *
+     * @param packet The packet to send.
+     */
+    void Send(Ptr<Packet> packet);
 
-  Ptr<LorawanMac> GetMac (void) const;
+    /**
+     * @copydoc ns3::NetDevice::Send
 
-  /**
-   * Get the LoraPhy instance that is linked to this NetDevice.
-   *
-   * \return the phy we are currently using.
-   */
-  Ptr<LoraPhy> GetPhy (void) const;
+     * @note This function is implemented to achieve compliance with the NetDevice
+     * interface. Note that the dest and protocolNumber args are ignored.
+     */
+    bool Send(Ptr<Packet> packet, const Address& dest, uint16_t protocolNumber) override;
 
-  /**
-   * Get the slice string
-   *
-   * \return the slice string
-   */
-  std::string SliceToString(SliceType sliceType);
+    /**
+     * Callback the Mac layer calls whenever a packet arrives and needs to be
+     * forwarded up the stack.
+     *
+     * @param packet The packet that was received.
+     */
+    void Receive(Ptr<Packet> packet);
 
-  /**
-   * Get the slice on the gateway this NetDevice is linked to.
-   *
-   * \return the slice identification we are currently using.
-   */
-   uint8_t GetSlice (void) const;
+    // From class NetDevice. Some of these have little meaning for a LoRaWAN
+    // network device (since, for instance, IP is not used in the standard)
+    void SetReceiveCallback(NetDevice::ReceiveCallback cb) override;
+    Ptr<Channel> GetChannel() const override;
+    void SetNode(Ptr<Node> node) override;
+    Ptr<Node> GetNode() const override;
 
-  /**
-   * Send a packet through the LoRaWAN stack.
-   *
-   * \param packet The packet to send.
-   */
-  void Send (Ptr<Packet> packet);
+    void SetIfIndex(const uint32_t index) override;
+    uint32_t GetIfIndex() const override;
+    void SetAddress(Address address) override;
+    Address GetAddress() const override;
+    bool SetMtu(const uint16_t mtu) override;
+    uint16_t GetMtu() const override;
+    bool IsLinkUp() const override;
+    void AddLinkChangeCallback(Callback<void> callback) override;
+    bool IsBroadcast() const override;
+    Address GetBroadcast() const override;
+    bool IsMulticast() const override;
+    Address GetMulticast(Ipv4Address multicastGroup) const override;
+    Address GetMulticast(Ipv6Address addr) const override;
+    bool IsBridge() const override;
+    bool IsPointToPoint() const override;
+    bool SendFrom(Ptr<Packet> packet,
+                  const Address& source,
+                  const Address& dest,
+                  uint16_t protocolNumber) override;
+    bool NeedsArp() const override;
+    void SetPromiscReceiveCallback(PromiscReceiveCallback cb) override;
+    bool SupportsSendFrom() const override;
 
-  /**
-   * This function is implemented to achieve compliance with the NetDevice
-   * interface. Note that the dest and protocolNumber args are ignored.
-   */
-  bool Send (Ptr<Packet> packet, const Address& dest, uint16_t protocolNumber);
+  protected:
+    /**
+     * Receive a packet from the lower layer and pass the
+     * packet up the stack.
+     *
+     * @param packet The packet we need to forward.
+     * @param from The from address.
+     * @param to The to address.
+     *
+     * @todo Not implemented, this is a placeholder for future implementation.
+     */
+    void ForwardUp(Ptr<Packet> packet, Mac48Address from, Mac48Address to);
 
-  /**
-   * Callback the Mac layer calls whenever a packet arrives and needs to be
-   * forwarded up the stack.
-   *
-   * \param packet The packet that was received.
-   */
-  void Receive (Ptr<Packet> packet);
+  private:
+    /**
+     * Return the LoraChannel this device is connected to.
+     *
+     * @return A pointer to the LoraChannel object.
+     */
+    Ptr<LoraChannel> DoGetChannel() const;
 
-  // From class NetDevice. Some of these have little meaning for a LoRaWAN
-  // network device (since, for instance, IP is not used in the standard)
-  virtual void SetReceiveCallback (NetDevice::ReceiveCallback cb);
-  virtual Ptr<Channel> GetChannel (void) const;
-  virtual void SetNode (Ptr<Node> node);
-  virtual Ptr<Node> GetNode (void) const;
+    /**
+     * Complete the configuration of this LoRa device by connecting all lower
+     * components (PHY, MAC, Channel) together.
+     */
+    void CompleteConfig();
 
-  virtual void SetIfIndex (const uint32_t index);
-  virtual uint32_t GetIfIndex (void) const;
-  virtual void SetAddress (Address address);
-  virtual Address GetAddress (void) const;
-  virtual bool SetMtu (const uint16_t mtu);
-  virtual uint16_t GetMtu (void) const;
-  virtual bool IsLinkUp (void) const;
-  virtual void AddLinkChangeCallback (Callback<void> callback);
-  virtual bool IsBroadcast (void) const;
-  virtual Address GetBroadcast (void) const;
-  virtual bool IsMulticast (void) const;
-  virtual Address GetMulticast (Ipv4Address multicastGroup) const;
-  virtual Address GetMulticast (Ipv6Address addr) const;
-  virtual bool IsBridge (void) const;
-  virtual bool IsPointToPoint (void) const;
-  virtual bool SendFrom (Ptr<Packet> packet, const Address& source, const Address& dest, uint16_t protocolNumber);
-  virtual bool NeedsArp (void) const;
-  virtual void SetPromiscReceiveCallback (PromiscReceiveCallback cb);
-  virtual bool SupportsSendFrom (void) const;
+    // Member variables
+    Ptr<Node> m_node;      //!< The Node this NetDevice is connected to.
+    Ptr<LoraPhy> m_phy;    //!< The LoraPhy this NetDevice is connected to.
+    Ptr<LorawanMac> m_mac; //!< The LorawanMac this NetDevice is connected to.
+    bool m_configComplete; //!< Whether the configuration was already completed.
 
-protected:
-  /**
-   * Receive a packet from the lower layer and pass the
-   * packet up the stack.
-   *
-   * \param packet The packet we need to forward.
-   * \param from The from address.
-   * \param to The to address.
-   */
-  void ForwardUp (Ptr<Packet> packet, Mac48Address from, Mac48Address to);
-
-private:
-  /**
-   * Return the LoraChannel this device is connected to.
-   */
-  Ptr<LoraChannel> DoGetChannel (void) const;
-
-  /**
-   * Complete the configuration of this LoRa device by connecting all lower
-   * components (PHY, MAC, Channel) together.
-   */
-  void CompleteConfig (void);
-
-  // Member variables
-  Ptr<Node> m_node; //!< The Node this NetDevice is connected to.
-  Ptr<LoraPhy> m_phy; //!< The LoraPhy this NetDevice is connected to.
-  Ptr<LorawanMac> m_mac; //!< The LorawanMac this NetDevice is connected to.
-  uint8_t m_slice_id; //!< Slice identification this NetDevice is connected to.
-  bool m_configComplete; //!< Whether the configuration was already completed.
-
-  /**
-   * Upper layer callback used for notification of new data packet arrivals.
-   */
-  NetDevice::ReceiveCallback m_receiveCallback;
+    /**
+     * Upper layer callback used for notification of new data packet arrivals.
+     */
+    NetDevice::ReceiveCallback m_receiveCallback;
 };
 
-} //namespace ns3
+} // namespace lorawan
+} // namespace ns3
 
-}
 #endif /* LORA_NET_DEVICE_H */

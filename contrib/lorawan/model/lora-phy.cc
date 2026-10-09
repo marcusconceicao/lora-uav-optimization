@@ -1,223 +1,273 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Davide Magrin <magrinda@dei.unipd.it>
  */
 
-#include "ns3/lora-phy.h"
-#include "ns3/log.h"
-#include "ns3/simulator.h"
-#include <algorithm>
+#include "lora-phy.h"
 
-namespace ns3 {
-namespace lorawan {
+#include "lora-channel.h"
 
-NS_LOG_COMPONENT_DEFINE ("LoraPhy");
+#include "ns3/node.h"
 
-NS_OBJECT_ENSURE_REGISTERED (LoraPhy);
+namespace ns3
+{
+namespace lorawan
+{
+
+std::ostream&
+operator<<(std::ostream& os, const IQPolarity& iqPolarity)
+{
+    switch (iqPolarity)
+    {
+    case IQPolarity::UP:
+        return os << "UP";
+    case IQPolarity::DOWN:
+        return os << "DOWN";
+    default:
+        NS_FATAL_ERROR("Unknown I/Q polarity value");
+        return (os << "UNKNOWN");
+    }
+}
+
+std::ostream&
+operator<<(std::ostream& os, const CodingRate& codingRate)
+{
+    switch (codingRate)
+    {
+    case CodingRate::CR_4_5:
+        return os << "4/5";
+    case CodingRate::CR_4_6:
+        return os << "4/6";
+    case CodingRate::CR_4_7:
+        return os << "4/7";
+    case CodingRate::CR_4_8:
+        return os << "4/8";
+    default:
+        NS_FATAL_ERROR("Unknown coding rate value");
+        return (os << "UNKNOWN");
+    }
+}
+
+std::istream&
+operator>>(std::istream& is, CodingRate& codingRate)
+{
+    std::string value;
+    is >> value;
+    if (value == "4/5")
+    {
+        codingRate = CodingRate::CR_4_5;
+    }
+    else if (value == "4/6")
+    {
+        codingRate = CodingRate::CR_4_6;
+    }
+    else if (value == "4/7")
+    {
+        codingRate = CodingRate::CR_4_7;
+    }
+    else if (value == "4/8")
+    {
+        codingRate = CodingRate::CR_4_8;
+    }
+    else
+    {
+        is.setstate(std::ios_base::failbit);
+    }
+    NS_ABORT_MSG_IF(is.bad(), "Failure to parse " << value);
+    return is;
+}
+
+std::ostream&
+operator<<(std::ostream& os, const LoraTxParameters& params)
+{
+    os << "LoraTxParameters("
+       << "spreadingFactor=" << unsigned(params.spreadingFactor) << ", "
+       << "bandwidthHz=" << params.bandwidthHz << ", "
+       << "codingRate=" << params.codingRate << ", "
+       << "lowDataRateOptimize=" << params.lowDataRateOptimize << ", "
+       << "preambleLenSymb: " << params.preambleLenSymb << ", "
+       << "implicitHeader=" << params.implicitHeader << ", "
+       << "crcEnabled=" << params.crcEnabled << ")";
+    return os;
+}
+
+NS_LOG_COMPONENT_DEFINE("LoraPhy");
+
+NS_OBJECT_ENSURE_REGISTERED(LoraPhy);
+
+Time
+LoraPhy::GetTSym(uint8_t spreadingFactor, uint32_t bandwidthHz)
+{
+    auto sf = static_cast<double>(spreadingFactor);
+    auto bw = static_cast<double>(bandwidthHz);
+    return Seconds(pow(2, sf) / bw);
+}
+
+Time
+LoraPhy::GetTimeOnAir(uint32_t phyPayloadLen, const LoraTxParameters& txParams)
+{
+    NS_LOG_FUNCTION(phyPayloadLen << txParams);
+
+    // The contents of this function are based on [1].
+    // [1] SX1272 LoRa modem designer's guide.
+
+    // Compute the symbol duration in seconds
+    double tSym = GetTSym(txParams.spreadingFactor, txParams.bandwidthHz).GetSeconds();
+
+    // Compute the preamble duration
+    auto nPreamble = static_cast<double>(txParams.preambleLenSymb);
+    double tPreamble = (nPreamble + 4.25) * tSym;
+
+    // Payload size
+    NS_LOG_DEBUG("PHY Packet of size " << phyPayloadLen << " bytes");
+
+    // Safety casts since the formula deals with double values.
+    auto pl = static_cast<double>(phyPayloadLen);
+    auto sf = static_cast<double>(txParams.spreadingFactor);
+    auto cr = static_cast<double>(txParams.codingRate);
+    // de = 1 when the low data rate optimization is enabled, 0 otherwise
+    // h = 1 when header is implicit, 0 otherwise
+    // crc = 1 when cyclic redundancy check is present, 0 otherwise
+    double de = txParams.lowDataRateOptimize ? 1.0 : 0.0;
+    double h = txParams.implicitHeader ? 1.0 : 0.0;
+    double crc = txParams.crcEnabled ? 1.0 : 0.0;
+
+    // num and den refer to numerator and denominator of the time on air formula
+    double num = 8.0 * pl - 4.0 * sf + 28.0 + 16.0 * crc - 20.0 * h;
+    double den = 4.0 * (sf - 2.0 * de);
+    double payloadSymbNb = 8.0 + std::max(std::ceil(num / den) * (cr + 4.0), 0.0);
+
+    // Time to transmit the payload
+    double tPayload = payloadSymbNb * tSym;
+
+    NS_LOG_DEBUG("Time computation: num = " << num << ", den = " << den << ", payloadSymbNb = "
+                                            << payloadSymbNb << ", tSym = " << tSym);
+    NS_LOG_DEBUG("tPreamble = " << tPreamble);
+    NS_LOG_DEBUG("tPayload = " << tPayload);
+    NS_LOG_DEBUG("Total time = " << tPreamble + tPayload);
+
+    // Compute and return the total packet on-air time
+    return Seconds(tPreamble + tPayload);
+}
 
 TypeId
-LoraPhy::GetTypeId (void)
+LoraPhy::GetTypeId()
 {
-  static TypeId tid = TypeId ("ns3::LoraPhy")
-    .SetParent<Object> ()
-    .SetGroupName ("lorawan")
-    .AddTraceSource ("StartSending",
-                     "Trace source indicating the PHY layer"
-                     "has begun the sending process for a packet",
-                     MakeTraceSourceAccessor (&LoraPhy::m_startSending),
-                     "ns3::Packet::TracedCallback")
-    .AddTraceSource ("PhyRxBegin",
-                     "Trace source indicating a packet "
-                     "is now being received from the channel medium "
-                     "by the device",
-                     MakeTraceSourceAccessor (&LoraPhy::m_phyRxBeginTrace),
-                     "ns3::Packet::TracedCallback")
-    .AddTraceSource ("PhyRxEnd",
-                     "Trace source indicating the PHY has finished "
-                     "the reception process for a packet",
-                     MakeTraceSourceAccessor (&LoraPhy::m_phyRxEndTrace),
-                     "ns3::Packet::TracedCallback")
-    .AddTraceSource ("ReceivedPacket",
-                     "Trace source indicating a packet "
-                     "was correctly received",
-                     MakeTraceSourceAccessor
-                       (&LoraPhy::m_successfullyReceivedPacket),
-                     "ns3::Packet::TracedCallback")
-    .AddTraceSource ("LostPacketBecauseInterference",
-                     "Trace source indicating a packet "
-                     "could not be correctly decoded because of interfering"
-                     "signals",
-                     MakeTraceSourceAccessor (&LoraPhy::m_interferedPacket),
-                     "ns3::Packet::TracedCallback")
-    .AddTraceSource ("LostPacketBecauseUnderSensitivity",
-                     "Trace source indicating a packet "
-                     "could not be correctly received because"
-                     "its received power is below the sensitivity of the receiver",
-                     MakeTraceSourceAccessor (&LoraPhy::m_underSensitivity),
-                     "ns3::Packet::TracedCallback");
-  return tid;
+    static TypeId tid =
+        TypeId("ns3::LoraPhy")
+            .SetParent<Object>()
+            .SetGroupName("lorawan")
+            .AddTraceSource("StartSending",
+                            "Trace source indicating the PHY layer"
+                            "has begun the sending process for a packet",
+                            MakeTraceSourceAccessor(&LoraPhy::m_startSending),
+                            "ns3::Packet::TracedCallback")
+            .AddTraceSource("PhyRxBegin",
+                            "Trace source indicating a packet "
+                            "is now being received from the channel medium "
+                            "by the device",
+                            MakeTraceSourceAccessor(&LoraPhy::m_phyRxBeginTrace),
+                            "ns3::Packet::TracedCallback")
+            .AddTraceSource("PhyRxEnd",
+                            "Trace source indicating the PHY has finished "
+                            "the reception process for a packet",
+                            MakeTraceSourceAccessor(&LoraPhy::m_phyRxEndTrace),
+                            "ns3::Packet::TracedCallback")
+            .AddTraceSource("ReceivedPacket",
+                            "Trace source indicating a packet "
+                            "was correctly received",
+                            MakeTraceSourceAccessor(&LoraPhy::m_successfullyReceivedPacket),
+                            "ns3::Packet::TracedCallback")
+            .AddTraceSource("LostPacketBecauseInterference",
+                            "Trace source indicating a packet "
+                            "could not be correctly decoded because of interfering"
+                            "signals",
+                            MakeTraceSourceAccessor(&LoraPhy::m_interferedPacket),
+                            "ns3::Packet::TracedCallback")
+            .AddTraceSource("LostPacketBecauseUnderSensitivity",
+                            "Trace source indicating a packet "
+                            "could not be correctly received because"
+                            "its received power is below the sensitivity of the receiver",
+                            MakeTraceSourceAccessor(&LoraPhy::m_underSensitivity),
+                            "ns3::Packet::TracedCallback");
+    return tid;
 }
 
-LoraPhy::LoraPhy ()
-{
-}
-
-LoraPhy::~LoraPhy ()
+LoraPhy::LoraPhy()
 {
 }
 
-Ptr<NetDevice>
-LoraPhy::GetDevice (void) const
+LoraPhy::~LoraPhy()
 {
-  return m_device;
 }
 
 void
-LoraPhy::SetDevice (Ptr<NetDevice> device)
+LoraPhy::SetTxFinishedCallback(TxFinishedCallback callback)
 {
-  NS_LOG_FUNCTION (this << device);
-
-  m_device = device;
+    m_txFinishedCallback = callback;
 }
 
-Ptr<LoraChannel>
-LoraPhy::GetChannel (void) const
+void
+LoraPhy::SetReceiveOkCallback(RxOkCallback callback)
 {
-  NS_LOG_FUNCTION_NOARGS ();
+    m_rxOkCallback = callback;
+}
 
-  return m_channel;
+void
+LoraPhy::SetReceiveFailedCallback(RxFailedCallback callback)
+{
+    m_rxFailedCallback = callback;
 }
 
 Ptr<MobilityModel>
-LoraPhy::GetMobility (void)
+LoraPhy::GetMobility()
 {
-  NS_LOG_FUNCTION_NOARGS ();
+    NS_LOG_FUNCTION_NOARGS();
 
-  // If there is a mobility model associated to this PHY, take the mobility from
-  // there
-  if (m_mobility != 0)
-    {
-      return m_mobility;
-    }
-  else     // Else, take it from the node
-    {
-      return m_device->GetNode ()->GetObject<MobilityModel> ();
-    }
+    // Return mobility model associated to this PHY, else, take it from the node
+    return (m_mobility) ? m_mobility : m_device->GetNode()->GetObject<MobilityModel>();
 }
 
 void
-LoraPhy::SetMobility (Ptr<MobilityModel> mobility)
+LoraPhy::SetMobility(Ptr<MobilityModel> mobility)
 {
-  NS_LOG_FUNCTION_NOARGS ();
+    NS_LOG_FUNCTION_NOARGS();
 
-  m_mobility = mobility;
+    m_mobility = mobility;
+}
+
+Ptr<LoraChannel>
+LoraPhy::GetChannel() const
+{
+    NS_LOG_FUNCTION_NOARGS();
+
+    return m_channel;
 }
 
 void
-LoraPhy::SetChannel (Ptr<LoraChannel> channel)
+LoraPhy::SetChannel(Ptr<LoraChannel> channel)
 {
-  NS_LOG_FUNCTION (this << channel);
+    NS_LOG_FUNCTION(this << channel);
 
-  m_channel = channel;
+    m_channel = channel;
+}
+
+Ptr<NetDevice>
+LoraPhy::GetDevice() const
+{
+    return m_device;
 }
 
 void
-LoraPhy::SetReceiveOkCallback (RxOkCallback callback)
+LoraPhy::SetDevice(Ptr<NetDevice> device)
 {
-  m_rxOkCallback = callback;
+    NS_LOG_FUNCTION(this << device);
+
+    m_device = device;
 }
 
-void
-LoraPhy::SetReceiveFailedCallback (RxFailedCallback callback)
-{
-  m_rxFailedCallback = callback;
-}
-
-void
-LoraPhy::SetTxFinishedCallback (TxFinishedCallback callback)
-{
-  m_txFinishedCallback = callback;
-}
-
-Time
-LoraPhy::GetTSym (LoraTxParameters txParams)
-{
-  return Seconds (pow (2, int (txParams.sf)) / (txParams.bandwidthHz));
-}
-
-Time
-LoraPhy::GetOnAirTime (Ptr<Packet> packet, LoraTxParameters txParams)
-{
-
-  NS_LOG_FUNCTION (packet << txParams);
-
-  // The contents of this function are based on [1].
-  // [1] SX1272 LoRa modem designer's guide.
-
-  // Compute the symbol duration
-  // Bandwidth is in Hz
-  double tSym = GetTSym(txParams).GetSeconds();
-
-  // Compute the preamble duration
-  double tPreamble = (double(txParams.nPreamble) + 4.25) * tSym;
-
-  // Payload size
-  uint32_t pl = packet->GetSize ();      // Size in bytes
-  NS_LOG_DEBUG ("Packet of size " << pl << " bytes");
-
-  // This step is needed since the formula deals with double values.
-  // de = 1 when the low data rate optimization is enabled, 0 otherwise
-  // h = 1 when header is implicit, 0 otherwise
-  double de = txParams.lowDataRateOptimizationEnabled ? 1 : 0;
-  double h = txParams.headerDisabled ? 1 : 0;
-  double crc = txParams.crcEnabled ? 1 : 0;
-
-  // num and den refer to numerator and denominator of the time on air formula
-  double num = 8 * pl - 4 * txParams.sf + 28 + 16 * crc - 20 * h;
-  double den = 4 * (txParams.sf - 2 * de);
-  double payloadSymbNb = 8 + std::max (std::ceil (num / den) *
-                                       (txParams.codingRate + 4), double(0));
-
-  // Time to transmit the payload
-  double tPayload = payloadSymbNb * tSym;
-
-  NS_LOG_DEBUG ("Time computation: num = " << num << ", den = " << den <<
-                ", payloadSymbNb = " << payloadSymbNb << ", tSym = " << tSym);
-  NS_LOG_DEBUG ("tPreamble = " << tPreamble);
-  NS_LOG_DEBUG ("tPayload = " << tPayload);
-  NS_LOG_DEBUG ("Total time = " << tPreamble + tPayload);
-
-  // Compute and return the total packet on-air time
-  return Seconds (tPreamble + tPayload);
-}
-
-std::ostream &operator << (std::ostream &os, const LoraTxParameters &params)
-{
-  os << "SF: " << unsigned(params.sf) <<
-    ", headerDisabled: " << params.headerDisabled <<
-    ", codingRate: " << unsigned(params.codingRate) <<
-    ", bandwidthHz: " << params.bandwidthHz <<
-    ", nPreamble: " << params.nPreamble <<
-    ", crcEnabled: " << params.crcEnabled <<
-    ", lowDataRateOptimizationEnabled: " << params.lowDataRateOptimizationEnabled <<
-    ")";
-
-  return os;
-}
-}
-}
+} // namespace lorawan
+} // namespace ns3

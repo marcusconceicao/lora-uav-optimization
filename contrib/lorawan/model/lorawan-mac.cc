@@ -1,190 +1,189 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Davide Magrin <magrinda@dei.unipd.it>
  */
 
-#include "ns3/lorawan-mac.h"
-#include "ns3/log.h"
+#include "lorawan-mac.h"
 
-namespace ns3 {
-namespace lorawan {
+#include "lora-phy.h"
 
-NS_LOG_COMPONENT_DEFINE ("LorawanMac");
+namespace ns3
+{
+namespace lorawan
+{
 
-NS_OBJECT_ENSURE_REGISTERED (LorawanMac);
+NS_LOG_COMPONENT_DEFINE("LorawanMac");
+
+NS_OBJECT_ENSURE_REGISTERED(LorawanMac);
 
 TypeId
-LorawanMac::GetTypeId (void)
+LorawanMac::GetTypeId()
 {
-  static TypeId tid = TypeId ("ns3::LorawanMac")
-    .SetParent<Object> ()
-    .SetGroupName ("lorawan")
-    .AddTraceSource ("SentNewPacket",
-                     "Trace source indicating a new packet "
-                     "arrived at the MAC layer",
-                     MakeTraceSourceAccessor (&LorawanMac::m_sentNewPacket),
-                     "ns3::Packet::TracedCallback")
-    .AddTraceSource ("ReceivedPacket",
-                     "Trace source indicating a packet "
-                     "was correctly received at the MAC layer",
-                     MakeTraceSourceAccessor (&LorawanMac::m_receivedPacket),
-                     "ns3::Packet::TracedCallback")
-    .AddTraceSource ("CannotSendBecauseDutyCycle",
-                     "Trace source indicating a packet "
-                     "could not be sent immediately because of duty cycle limitations",
-                     MakeTraceSourceAccessor (&LorawanMac::m_cannotSendBecauseDutyCycle),
-                     "ns3::Packet::TracedCallback");
-  return tid;
+    static TypeId tid =
+        TypeId("ns3::LorawanMac")
+            .SetParent<Object>()
+            .SetGroupName("lorawan")
+            .AddTraceSource("SentNewPacket",
+                            "Trace source indicating a new packet "
+                            "arrived at the MAC layer",
+                            MakeTraceSourceAccessor(&LorawanMac::m_sentNewPacket),
+                            "ns3::Packet::TracedCallback")
+            .AddTraceSource("ReceivedPacket",
+                            "Trace source indicating a packet "
+                            "was correctly received at the MAC layer",
+                            MakeTraceSourceAccessor(&LorawanMac::m_receivedPacket),
+                            "ns3::Packet::TracedCallback")
+            .AddTraceSource("CannotSendBecauseDutyCycle",
+                            "Trace source indicating a packet "
+                            "could not be sent immediately because of duty cycle limitations",
+                            MakeTraceSourceAccessor(&LorawanMac::m_cannotSendBecauseDutyCycle),
+                            "ns3::Packet::TracedCallback");
+    return tid;
 }
 
-LorawanMac::LorawanMac ()
+LorawanMac::LorawanMac()
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 }
 
-LorawanMac::~LorawanMac ()
+LorawanMac::~LorawanMac()
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 }
 
 void
-LorawanMac::SetDevice (Ptr<NetDevice> device)
+LorawanMac::SetReceiveCallback(ReceiveCallback cb)
 {
-  m_device = device;
+    m_receiveCallback = cb;
+}
+
+void
+LorawanMac::SetDevice(Ptr<NetDevice> device)
+{
+    m_device = device;
 }
 
 Ptr<NetDevice>
-LorawanMac::GetDevice (void)
+LorawanMac::GetDevice() const
 {
-  return m_device;
+    return m_device;
 }
 
 Ptr<LoraPhy>
-LorawanMac::GetPhy (void)
+LorawanMac::GetPhy() const
 {
-  return m_phy;
+    return m_phy;
 }
 
 void
-LorawanMac::SetPhy (Ptr<LoraPhy> phy)
+LorawanMac::SetPhy(Ptr<LoraPhy> phy)
 {
-  // Set the phy
-  m_phy = phy;
+    // Set the phy
+    m_phy = phy;
 
-  // Connect the receive callbacks
-  m_phy->SetReceiveOkCallback (MakeCallback (&LorawanMac::Receive, this));
-  m_phy->SetReceiveFailedCallback (MakeCallback (&LorawanMac::FailedReception, this));
-  m_phy->SetTxFinishedCallback (MakeCallback (&LorawanMac::TxFinished, this));
+    // Connect the receive callbacks
+    m_phy->SetReceiveOkCallback(MakeCallback(&LorawanMac::Receive, this));
+    m_phy->SetReceiveFailedCallback(MakeCallback(&LorawanMac::FailedReception, this));
+    m_phy->SetTxFinishedCallback(MakeCallback(&LorawanMac::TxFinished, this));
 }
 
-LogicalLoraChannelHelper
-LorawanMac::GetLogicalLoraChannelHelper (void)
+Ptr<LogicalLoraChannelHelper>
+LorawanMac::GetLogicalLoraChannelHelper() const
 {
-  return m_channelHelper;
+    return m_channelHelper;
 }
 
 void
-LorawanMac::SetLogicalLoraChannelHelper (LogicalLoraChannelHelper helper)
+LorawanMac::SetLogicalLoraChannelHelper(Ptr<LogicalLoraChannelHelper> helper)
 {
-  m_channelHelper = helper;
+    m_channelHelper = helper;
 }
 
 uint8_t
-LorawanMac::GetSfFromDataRate (uint8_t dataRate)
+LorawanMac::GetSfFromDataRate(uint8_t dataRate) const
 {
-  NS_LOG_FUNCTION (this << unsigned(dataRate));
+    NS_LOG_FUNCTION(this << unsigned(dataRate));
 
-  // Check we are in range
-  if (dataRate >= m_sfForDataRate.size ())
+    // Check we are in range
+    if (dataRate >= m_sfForDataRate.size())
     {
-      return 0;
+        return 0;
     }
 
-  return m_sfForDataRate.at (dataRate);
+    return m_sfForDataRate.at(dataRate);
+}
+
+uint32_t
+LorawanMac::GetBandwidthFromDataRate(uint8_t dataRate) const
+{
+    NS_LOG_FUNCTION(this << unsigned(dataRate));
+
+    // Check we are in range
+    if (dataRate > m_bandwidthForDataRate.size())
+    {
+        return 0;
+    }
+
+    return m_bandwidthForDataRate.at(dataRate);
 }
 
 double
-LorawanMac::GetBandwidthFromDataRate (uint8_t dataRate)
+LorawanMac::GetDbmForTxPower(uint8_t txPower) const
 {
-  NS_LOG_FUNCTION (this << unsigned(dataRate));
+    NS_LOG_FUNCTION(this << unsigned(txPower));
 
-  // Check we are in range
-  if (dataRate > m_bandwidthForDataRate.size ())
+    if (txPower > m_txDbmForTxPower.size() - 1)
     {
-      return 0;
+        return -1;
     }
 
-  return m_bandwidthForDataRate.at (dataRate);
-}
-
-double
-LorawanMac::GetDbmForTxPower (uint8_t txPower)
-{
-  NS_LOG_FUNCTION (this << unsigned (txPower));
-
-  if (txPower > m_txDbmForTxPower.size ())
-    {
-      return 0;
-    }
-
-  return m_txDbmForTxPower.at (txPower);
+    return m_txDbmForTxPower.at(txPower);
 }
 
 void
-LorawanMac::SetSfForDataRate (std::vector<uint8_t> sfForDataRate)
+LorawanMac::SetSfForDataRate(std::vector<uint8_t> sfForDataRate)
 {
-  m_sfForDataRate = sfForDataRate;
+    m_sfForDataRate = sfForDataRate;
 }
 
 void
-LorawanMac::SetBandwidthForDataRate (std::vector<double> bandwidthForDataRate)
+LorawanMac::SetBandwidthForDataRate(std::vector<uint32_t> bandwidthForDataRate)
 {
-  m_bandwidthForDataRate = bandwidthForDataRate;
+    m_bandwidthForDataRate = bandwidthForDataRate;
 }
 
 void
-LorawanMac::SetMaxAppPayloadForDataRate (std::vector<uint32_t> maxAppPayloadForDataRate)
+LorawanMac::SetMaxMacPayloadForDataRate(std::vector<uint32_t> maxMacPayloadForDataRate)
 {
-  m_maxAppPayloadForDataRate = maxAppPayloadForDataRate;
+    m_maxMacPayloadForDataRate = maxMacPayloadForDataRate;
 }
 
 void
-LorawanMac::SetTxDbmForTxPower (std::vector<double> txDbmForTxPower)
+LorawanMac::SetTxDbmForTxPower(std::vector<double> txDbmForTxPower)
 {
-  m_txDbmForTxPower = txDbmForTxPower;
+    m_txDbmForTxPower = txDbmForTxPower;
 }
 
 void
-LorawanMac::SetNPreambleSymbols (int nPreambleSymbols)
+LorawanMac::SetNPreambleSymbols(int nPreambleSymbols)
 {
-  m_nPreambleSymbols = nPreambleSymbols;
+    m_nPreambleSymbols = nPreambleSymbols;
 }
 
 int
-LorawanMac::GetNPreambleSymbols (void)
+LorawanMac::GetNPreambleSymbols() const
 {
-  return m_nPreambleSymbols;
+    return m_nPreambleSymbols;
 }
 
 void
-LorawanMac::SetReplyDataRateMatrix (ReplyDataRateMatrix replyDataRateMatrix)
+LorawanMac::SetReplyDataRateMatrix(ReplyDataRateMatrix replyDataRateMatrix)
 {
-  m_replyDataRateMatrix = replyDataRateMatrix;
+    m_replyDataRateMatrix = replyDataRateMatrix;
 }
-}
-}
+
+} // namespace lorawan
+} // namespace ns3

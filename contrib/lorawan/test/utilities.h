@@ -1,62 +1,55 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2018 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Authors: Davide Magrin <magrinda@dei.unipd.it>
  */
+
 #ifndef TEST_UTILITIES_H
 #define TEST_UTILITIES_H
 
-#include "ns3/lora-helper.h"
+#include "ns3/lora-channel.h"
+#include "ns3/lora-net-device.h"
 #include "ns3/mobility-helper.h"
-#include "ns3/position-allocator.h"
-#include "ns3/forwarder-helper.h"
-#include "ns3/network-server-helper.h"
+#include "ns3/node-container.h"
 
-namespace ns3 {
-namespace lorawan {
+namespace ns3
+{
+namespace lorawan
+{
 
+/**
+ * @ingroup lorawan
+ *
+ * Stores the main elements of a simulated LoRaWAN network
+ */
 struct NetworkComponents
 {
-  Ptr<LoraChannel> channel;
-  NodeContainer endDevices;
-  NodeContainer gateways;
-  Ptr<Node> nsNode;
+    Ptr<LoraChannel> channel; //!< A pointer to the LoraChannel object.
+    NodeContainer endDevices; //!< Container of the end device nodes.
+    NodeContainer gateways;   //!< Container of the gateway nodes.
+    Ptr<Node> nsNode;         //!< A pointer to the network server Node.
 };
 
-Ptr<LoraChannel> CreateChannel (void);
+Ptr<LoraChannel> CreateChannel();
 
-NodeContainer CreateEndDevices (int nDevices, MobilityHelper mobility,
-                                Ptr<LoraChannel> channel);
+NodeContainer CreateEndDevices(int nDevices, MobilityHelper mobility, Ptr<LoraChannel> channel);
 
-NodeContainer CreateGateways (int nGateways, MobilityHelper mobility,
-                              Ptr<LoraChannel> channel);
+NodeContainer CreateGateways(int nGateways, MobilityHelper mobility, Ptr<LoraChannel> channel);
 
-Ptr<Node> CreateNetworkServer (NodeContainer endDevices,
-                               NodeContainer gateways);
+Ptr<Node> CreateNetworkServer(NodeContainer endDevices, NodeContainer gateways);
 
 template <typename T>
 Ptr<T>
-GetMacLayerFromNode (Ptr<Node> n)
+GetMacLayerFromNode(Ptr<Node> n)
 {
-  return n->GetDevice (0)->GetObject<LoraNetDevice> ()->GetMac ()->GetObject<T> ();
+    return DynamicCast<T>(DynamicCast<LoraNetDevice>(n->GetDevice(0))->GetMac());
 }
 
-NetworkComponents InitializeNetwork (int nDevices, int nGateways);
-}
+NetworkComponents InitializeNetwork(int nDevices, int nGateways);
 
-}
-#endif
+} // namespace lorawan
+} // namespace ns3
+
+#endif /* TEST_UTILITIES_H */

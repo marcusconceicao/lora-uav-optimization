@@ -1,14 +1,7 @@
-/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
+ * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Romagnolo Stefano <romagnolostefano93@gmail.com>
  */
@@ -16,46 +9,45 @@
 #ifndef LORA_UTILS_H
 #define LORA_UTILS_H
 
-#include "ns3/nstime.h"
-#include "ns3/uinteger.h"
-
-namespace ns3 {
-namespace lorawan {
+namespace ns3
+{
+namespace lorawan
+{
 
 /**
  * Convert from dBm to Watts.
  *
- * \param dbm the power in dBm
+ * @param dbm The power in dBm.
  *
- * \return the equivalent Watts for the given dBm
+ * @return The equivalent Watts for the given dBm value.
  */
-double DbmToW (double dbm);
+double DbmToW(double dbm);
 /**
  * Convert from dB to ratio.
  *
- * \param db
+ * @param db The dB value.
  *
- * \return ratio
+ * @return The equivalent ratio from the given dB value.
  */
-double DbToRatio (double db);
+double DbToRatio(double db);
 /**
  * Convert from Watts to dBm.
  *
- * \param w the power in Watts
+ * @param w The power in Watts.
  *
- * \return the equivalent dBm for the given Watts
+ * @return The equivalent dBm for the given Watts.
  */
-double WToDbm (double w);
+double WToDbm(double w);
 /**
  * Convert from ratio to dB.
  *
- * \param ratio
+ * @param ratio The ratio value.
  *
- * \return dB
+ * @return The equivalent dB from the given ratio value.
  */
-double RatioToDb (double ratio);
+double RatioToDb(double ratio);
 
-}   // namespace ns3
+} // namespace lorawan
+} // namespace ns3
 
-}
 #endif /* LORA_UTILS_H */

@@ -1,159 +1,127 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Davide Magrin <magrinda@dei.unipd.it>
- * Adapted: Rogério S Silva <rogeriosousa@discente.ufg.br>
- * Changes: add LoRa slice identification: m_slice_id.
  */
 
-#include "ns3/lora-net-device.h"
-#include "ns3/pointer.h"
+#include "lora-net-device.h"
+
+#include "lora-channel.h"
+#include "lora-phy.h"
+#include "lorawan-mac.h"
+
 #include "ns3/node.h"
-#include "ns3/log.h"
-#include "ns3/abort.h"
-#include "ns3/uinteger.h"
+#include "ns3/pointer.h"
 
-namespace ns3 {
-namespace lorawan {
+namespace ns3
+{
+namespace lorawan
+{
 
-NS_LOG_COMPONENT_DEFINE ("LoraNetDevice");
+NS_LOG_COMPONENT_DEFINE("LoraNetDevice");
 
-NS_OBJECT_ENSURE_REGISTERED (LoraNetDevice);
+NS_OBJECT_ENSURE_REGISTERED(LoraNetDevice);
 
 TypeId
-LoraNetDevice::GetTypeId (void)
+LoraNetDevice::GetTypeId()
 {
-  static TypeId tid = TypeId ("ns3::LoraNetDevice")
-    .SetParent<NetDevice> ()
-    .AddConstructor<LoraNetDevice> ()
-    .SetGroupName ("lorawan")
-    .AddAttribute ("Channel", "The channel attached to this device",
-                   PointerValue (),
-                   MakePointerAccessor (&LoraNetDevice::DoGetChannel),
-                   MakePointerChecker<LoraChannel> ())
-    .AddAttribute ("Phy", "The PHY layer attached to this device.",
-                   PointerValue (),
-                   MakePointerAccessor (&LoraNetDevice::GetPhy,
-                                        &LoraNetDevice::SetPhy),
-                   MakePointerChecker<LoraPhy> ())
-    .AddAttribute ("Mac", "The MAC layer attached to this device.",
-                   PointerValue (),
-                   MakePointerAccessor (&LoraNetDevice::GetMac,
-                                        &LoraNetDevice::SetMac),
-                   MakePointerChecker<LorawanMac> ())
-    .AddAttribute("Slice", "The Slice identification to this device.",
-                 UintegerValue (0),
-                 MakeUintegerAccessor(&LoraNetDevice::GetSlice,
-                                      &LoraNetDevice::SetSlice),
-                 MakeUintegerChecker<uint8_t> ());
-  return tid;
+    static TypeId tid =
+        TypeId("ns3::LoraNetDevice")
+            .SetParent<NetDevice>()
+            .AddConstructor<LoraNetDevice>()
+            .SetGroupName("lorawan")
+            .AddAttribute("Channel",
+                          "The channel attached to this device",
+                          PointerValue(),
+                          MakePointerAccessor(&LoraNetDevice::DoGetChannel),
+                          MakePointerChecker<LoraChannel>())
+            .AddAttribute("Phy",
+                          "The PHY layer attached to this device.",
+                          PointerValue(),
+                          MakePointerAccessor(&LoraNetDevice::GetPhy, &LoraNetDevice::SetPhy),
+                          MakePointerChecker<LoraPhy>())
+            .AddAttribute("Mac",
+                          "The MAC layer attached to this device.",
+                          PointerValue(),
+                          MakePointerAccessor(&LoraNetDevice::GetMac, &LoraNetDevice::SetMac),
+                          MakePointerChecker<LorawanMac>());
+    return tid;
 }
 
-LoraNetDevice::LoraNetDevice () :
-  m_node (0),
-  m_phy (0),
-  m_mac (0),
-  m_slice_id(0),
-  m_configComplete (0)
+LoraNetDevice::LoraNetDevice()
+    : m_node(nullptr),
+      m_phy(nullptr),
+      m_mac(nullptr),
+      m_configComplete(false)
 {
-  NS_LOG_FUNCTION_NOARGS ();
+    NS_LOG_FUNCTION_NOARGS();
 }
 
-LoraNetDevice::~LoraNetDevice ()
+LoraNetDevice::~LoraNetDevice()
 {
-  NS_LOG_FUNCTION_NOARGS ();
+    NS_LOG_FUNCTION_NOARGS();
 }
 
 void
-LoraNetDevice::SetMac (Ptr<LorawanMac> mac)
+LoraNetDevice::SetMac(Ptr<LorawanMac> mac)
 {
-  m_mac = mac;
+    m_mac = mac;
 }
 
 Ptr<LorawanMac>
-LoraNetDevice::GetMac (void) const
+LoraNetDevice::GetMac() const
 {
-  return m_mac;
+    return m_mac;
 }
 
 void
-LoraNetDevice::SetSlice (uint8_t slice)
+LoraNetDevice::SetPhy(Ptr<LoraPhy> phy)
 {
-  m_slice_id = slice;
-}
-
-uint8_t
-LoraNetDevice::GetSlice (void) const
-{
-  return m_slice_id;
-}
-
-std::string LoraNetDevice::SliceToString(SliceType sliceType)
-{
-  std::string sliceTypeString[3] = {"URA_SLICE","RA_SLICE","BE_SLICE"};
-
-  return sliceTypeString[sliceType];
-}
-
-void
-LoraNetDevice::SetPhy (Ptr<LoraPhy> phy)
-{
-  m_phy = phy;
+    m_phy = phy;
 }
 
 Ptr<LoraPhy>
-LoraNetDevice::GetPhy (void) const
+LoraNetDevice::GetPhy() const
 {
-  return m_phy;
+    return m_phy;
 }
 
 void
-LoraNetDevice::CompleteConfig (void)
+LoraNetDevice::CompleteConfig()
 {
-  NS_LOG_FUNCTION_NOARGS ();
+    NS_LOG_FUNCTION_NOARGS();
 
-  // Verify we have all the necessary pieces
-  if (m_mac == 0 || m_phy == 0 || m_node == 0 || m_configComplete)
+    // Verify we have all the necessary pieces
+    if (!m_mac || !m_phy || !m_node || m_configComplete)
     {
-      return;
+        return;
     }
 
-  m_mac->SetPhy (m_phy);
-  m_configComplete = true;
+    m_mac->SetPhy(m_phy);
+    m_mac->SetReceiveCallback(MakeCallback(&LoraNetDevice::Receive, this));
+    m_configComplete = true;
 }
 
 void
-LoraNetDevice::Send (Ptr<Packet> packet)
+LoraNetDevice::Send(Ptr<Packet> packet)
 {
-  NS_LOG_FUNCTION (this << packet);
+    NS_LOG_FUNCTION(this << packet);
 
-  // Send the packet to the MAC layer, if it exists
-  NS_ASSERT (m_mac != 0);
-  m_mac->Send (packet);
+    // Send the packet to the MAC layer, if it exists
+    NS_ASSERT(m_mac);
+    m_mac->Send(packet);
 }
 
 void
-LoraNetDevice::Receive (Ptr<Packet> packet)
+LoraNetDevice::Receive(Ptr<Packet> packet)
 {
-  NS_LOG_FUNCTION (this << packet);
+    NS_LOG_FUNCTION(this << packet);
 
-  // Fill protocol and address with empty stuff
-  NS_LOG_DEBUG ("Calling receiveCallback");
-  m_receiveCallback (this, packet, 0, Address ());
+    // Fill protocol and address with empty stuff
+    NS_LOG_DEBUG("Calling receiveCallback");
+    m_receiveCallback(this, packet, 0, Address());
 }
 
 /******************************************
@@ -161,201 +129,202 @@ LoraNetDevice::Receive (Ptr<Packet> packet)
  ******************************************/
 
 Ptr<Channel>
-LoraNetDevice::GetChannel (void) const
+LoraNetDevice::GetChannel() const
 {
-  NS_LOG_FUNCTION (this);
-  return m_phy->GetChannel ();
+    NS_LOG_FUNCTION(this);
+    return m_phy->GetChannel();
 }
 
 Ptr<LoraChannel>
-LoraNetDevice::DoGetChannel (void) const
+LoraNetDevice::DoGetChannel() const
 {
-  NS_LOG_FUNCTION (this);
-  return m_phy->GetChannel ();
+    NS_LOG_FUNCTION(this);
+    return m_phy->GetChannel();
 }
 
 void
-LoraNetDevice::SetIfIndex (const uint32_t index)
+LoraNetDevice::SetIfIndex(const uint32_t index)
 {
-  NS_LOG_FUNCTION (this << index);
+    NS_LOG_FUNCTION(this << index);
 }
 
 uint32_t
-LoraNetDevice::GetIfIndex (void) const
+LoraNetDevice::GetIfIndex() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return 0;
+    return 0;
 }
 
 void
-LoraNetDevice::SetAddress (Address address)
+LoraNetDevice::SetAddress(Address address)
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 }
 
 Address
-LoraNetDevice::GetAddress (void) const
+LoraNetDevice::GetAddress() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return Address ();
+    return Address();
 }
 
 bool
-LoraNetDevice::SetMtu (const uint16_t mtu)
+LoraNetDevice::SetMtu(const uint16_t mtu)
 {
-  NS_ABORT_MSG ("Unsupported");
+    NS_ABORT_MSG("Unsupported");
 
-  return false;
+    return false;
 }
 
 uint16_t
-LoraNetDevice::GetMtu (void) const
+LoraNetDevice::GetMtu() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return 0;
+    return 0;
 }
 
 bool
-LoraNetDevice::IsLinkUp (void) const
+LoraNetDevice::IsLinkUp() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return m_phy != 0;
+    return (bool)(m_phy);
 }
 
 void
-LoraNetDevice::AddLinkChangeCallback (Callback<void> callback)
+LoraNetDevice::AddLinkChangeCallback(Callback<void> callback)
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 }
 
 bool
-LoraNetDevice::IsBroadcast (void) const
+LoraNetDevice::IsBroadcast() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return true;
+    return true;
 }
 
 Address
-LoraNetDevice::GetBroadcast (void) const
+LoraNetDevice::GetBroadcast() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return Address ();
+    return Address();
 }
 
 bool
-LoraNetDevice::IsMulticast (void) const
+LoraNetDevice::IsMulticast() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return true;
+    return true;
 }
 
 Address
-LoraNetDevice::GetMulticast (Ipv4Address multicastGroup) const
+LoraNetDevice::GetMulticast(Ipv4Address multicastGroup) const
 {
-  NS_ABORT_MSG ("Unsupported");
+    NS_ABORT_MSG("Unsupported");
 
-  return Address ();
+    return Address();
 }
 
 Address
-LoraNetDevice::GetMulticast (Ipv6Address addr) const
+LoraNetDevice::GetMulticast(Ipv6Address addr) const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return Address ();
+    return Address();
 }
 
 bool
-LoraNetDevice::IsBridge (void) const
+LoraNetDevice::IsBridge() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return false;
+    return false;
 }
 
 bool
-LoraNetDevice::IsPointToPoint (void) const
+LoraNetDevice::IsPointToPoint() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return false;
+    return false;
 }
 
 bool
-LoraNetDevice::Send (Ptr<Packet> packet, const Address& dest,
-                     uint16_t protocolNumber)
+LoraNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t protocolNumber)
 
 {
-  NS_LOG_FUNCTION (this << packet << dest << protocolNumber);
+    NS_LOG_FUNCTION(this << packet << dest << protocolNumber);
 
-  // Fallback to the vanilla Send method
-  Send (packet);
+    // Fallback to the vanilla Send method
+    Send(packet);
 
-  return true;
+    return true;
 }
 
 bool
-LoraNetDevice::SendFrom (Ptr<Packet> packet, const Address& source,
-                         const Address& dest, uint16_t protocolNumber)
+LoraNetDevice::SendFrom(Ptr<Packet> packet,
+                        const Address& source,
+                        const Address& dest,
+                        uint16_t protocolNumber)
 
 {
-  NS_ABORT_MSG ("Unsupported");
+    NS_ABORT_MSG("Unsupported");
 
-  return false;
+    return false;
 }
 
 Ptr<Node>
-LoraNetDevice::GetNode (void) const
+LoraNetDevice::GetNode() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return m_node;
+    return m_node;
 }
 
 void
-LoraNetDevice::SetNode (Ptr<Node> node)
+LoraNetDevice::SetNode(Ptr<Node> node)
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  m_node = node;
-  CompleteConfig ();
+    m_node = node;
+    CompleteConfig();
 }
 
 bool
-LoraNetDevice::NeedsArp (void) const
+LoraNetDevice::NeedsArp() const
 {
-  NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION(this);
 
-  return true;
+    return true;
 }
 
 void
-LoraNetDevice::SetReceiveCallback (ReceiveCallback cb)
+LoraNetDevice::SetReceiveCallback(ReceiveCallback cb)
 {
-  NS_LOG_FUNCTION_NOARGS ();
-  m_receiveCallback = cb;
+    NS_LOG_FUNCTION_NOARGS();
+    m_receiveCallback = cb;
 }
 
 void
-LoraNetDevice::SetPromiscReceiveCallback (PromiscReceiveCallback cb)
+LoraNetDevice::SetPromiscReceiveCallback(PromiscReceiveCallback cb)
 {
-  NS_LOG_FUNCTION_NOARGS ();
+    NS_LOG_FUNCTION_NOARGS();
 }
 
 bool
-LoraNetDevice::SupportsSendFrom (void) const
+LoraNetDevice::SupportsSendFrom() const
 {
-  NS_LOG_FUNCTION_NOARGS ();
+    NS_LOG_FUNCTION_NOARGS();
 
-  return false;
+    return false;
 }
 
-}
-}
+} // namespace lorawan
+} // namespace ns3

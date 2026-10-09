@@ -1,19 +1,7 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2018 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Authors: Martina Capuzzo <capuzzom@dei.unipd.it>
  *          Davide Magrin <magrinda@dei.unipd.it>
@@ -22,20 +10,19 @@
 #ifndef NETWORK_STATUS_H
 #define NETWORK_STATUS_H
 
-#include "ns3/end-device-status.h"
-#include "ns3/class-a-end-device-lorawan-mac.h"
-#include "ns3/gateway-status.h"
-#include "ns3/lora-device-address.h"
-#include "ns3/network-scheduler.h"
+#include "end-device-status.h"
+#include "gateway-status.h"
 
-#include <iterator>
-
-namespace ns3 {
-namespace lorawan {
+namespace ns3
+{
+namespace lorawan
+{
 
 /**
+ * @ingroup lorawan
+ *
  * This class represents the knowledge about the state of the network that is
- * available at the Network Server. It is essentially a collection of two maps:
+ * available at the network server. It is essentially a collection of two maps:
  * one containing DeviceStatus objects, and the other containing GatewayStatus
  * objects.
  *
@@ -44,82 +31,113 @@ namespace lorawan {
  */
 class NetworkStatus : public Object
 {
-public:
-  static TypeId GetTypeId (void);
+  public:
+    /**
+     *  Register this type.
+     *  @return The object TypeId.
+     */
+    static TypeId GetTypeId();
 
-  NetworkStatus ();
-  virtual ~NetworkStatus ();
+    NetworkStatus();           //!< Default constructor
+    ~NetworkStatus() override; //!< Destructor
 
-  /**
-   * Add a device to the ones that are tracked by this NetworkStatus object.
-   */
-  void AddNode (Ptr<ClassAEndDeviceLorawanMac> edMac);
+    /**
+     * Add a device to the ones that are tracked by this NetworkStatus object.
+     *
+     * @param edMac Pointer to the MAC layer object of the device to be tracked.
+     */
+    void AddNode(Ptr<ClassAEndDeviceLorawanMac> edMac);
 
-  /**
-   * Add this gateway to the list of gateways connected to the network.
-   *
-   * Each GW is identified by its Address in the NS-GW network.
-   */
-  void AddGateway (Address &address, Ptr<GatewayStatus> gwStatus);
+    /**
+     * Add a new gateway to the list of gateways connected to the network.
+     *
+     * Each gateway is identified by its NetDevice Address in the network connecting it to the
+     * network server.
+     *
+     * @param address The gateway's NetDevice Address.
+     * @param gwStatus A pointer to a GatewayStatus object for the gateway.
+     */
+    void AddGateway(Address& address, Ptr<GatewayStatus> gwStatus);
 
-  /**
-   * Update network status on the received packet.
-   *
-   * \param packet the received packet.
-   * \param address the gateway this packet was received from.
-   */
-  void OnReceivedPacket (Ptr<const Packet> packet, const Address &gwaddress);
+    /**
+     * Update network status on a received packet.
+     *
+     * @param packet The received packet.
+     * @param gwaddress Address of the gateway this packet was received from.
+     */
+    void OnReceivedPacket(Ptr<const Packet> packet, const Address& gwaddress);
 
-  /**
-   * Return whether the specified device needs a reply.
-   *
-   * \param deviceAddress the address of the device we are interested in.
-   */
-  bool NeedsReply (LoraDeviceAddress deviceAddress);
+    /**
+     * Return whether the specified device needs a reply.
+     *
+     * @param deviceAddress The address of the device we are interested in.
+     * @return True if we need to reply to the last packet from the device, false otherwise.
+     */
+    bool NeedsReply(LoraDeviceAddress deviceAddress);
 
-  /**
-   * Return whether we have a gateway that is available to send a reply to the
-   * specified device.
-   *
-   * \param deviceAddress the address of the device we are interested in.
-   */
-  Address GetBestGatewayForDevice (LoraDeviceAddress deviceAddress, int window);
+    /**
+     * Return whether we have a gateway that is available to send a reply to the specified
+     * device.
+     *
+     * @param deviceAddress The address of the device we are interested in.
+     * @param window The device reception window we are currently targeting (1 or 2).
+     * @return The Address of the gateway which measured the best RSSI of the last packet from the
+     * device, selected among the gateways being currently available for downlink transmission.
+     */
+    Address GetBestGatewayForDevice(LoraDeviceAddress deviceAddress, int window);
 
-  /**
-   * Send a packet through a Gateway.
-   *
-   * This function assumes that the packet is already tagged with a LoraTag
-   * that will inform the gateway of the parameters to use for the
-   * transmission.
-   */
-  void SendThroughGateway (Ptr<Packet> packet, Address gwAddress);
+    /**
+     * Send a packet through a gateway.
+     *
+     * This function assumes that the packet is already tagged with a LoraTag
+     * that will inform the gateway of the parameters to use for the
+     * transmission.
+     *
+     * @param packet The packet.
+     * @param gwAddress The address of the gateway.
+     */
+    void SendThroughGateway(Ptr<Packet> packet, Address gwAddress);
 
-  /**
-   * Get the reply for the specified device address.
-   */
-  Ptr<Packet> GetReplyForDevice (LoraDeviceAddress edAddress, int windowNumber);
+    /**
+     * Get the reply packet prepared for a reception window of a device.
+     *
+     * @param edAddress The address of the device.
+     * @param windowNumber The reception window number (1 or 2).
+     * @return The reply packet.
+     */
+    Ptr<Packet> GetReplyForDevice(LoraDeviceAddress edAddress, int windowNumber);
 
-  /**
-   * Get the EndDeviceStatus for the device that sent a packet.
-   */
-  Ptr<EndDeviceStatus> GetEndDeviceStatus (Ptr<Packet const> packet);
+    /**
+     * Get the EndDeviceStatus of the device that sent a packet.
+     *
+     * @param packet The packet sent by the end device.
+     * @return A pointer to the end device status.
+     */
+    Ptr<EndDeviceStatus> GetEndDeviceStatus(Ptr<const Packet> packet);
 
-  /**
-   * Get the EndDeviceStatus corresponding to a LoraDeviceAddress.
-   */
-  Ptr<EndDeviceStatus> GetEndDeviceStatus (LoraDeviceAddress address);
+    /**
+     * Get the EndDeviceStatus corresponding to a LoraDeviceAddress.
+     *
+     * @param address The LoraDeviceAddress of the end device.
+     * @return A pointer to the end device status.
+     */
+    Ptr<EndDeviceStatus> GetEndDeviceStatus(LoraDeviceAddress address);
 
-  /**
-   * Return the number of end devices currently managed by the server.
-   */
-  int CountEndDevices (void);
+    /**
+     * Return the number of end devices currently managed by the server.
+     *
+     * @return The number of end devices as an int.
+     */
+    int CountEndDevices();
 
-public:
-  std::map<LoraDeviceAddress, Ptr<EndDeviceStatus>> m_endDeviceStatuses;
-  std::map<Address, Ptr<GatewayStatus>> m_gatewayStatuses;
+  public:
+    std::map<LoraDeviceAddress, Ptr<EndDeviceStatus>>
+        m_endDeviceStatuses; //!< Map tracking the state of devices connected to this network server
+    std::map<Address, Ptr<GatewayStatus>>
+        m_gatewayStatuses; //!< Map tracking the state of gateways connected to this network server
 };
 
 } // namespace lorawan
-
 } // namespace ns3
+
 #endif /* NETWORK_STATUS_H */

@@ -1,156 +1,140 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2017 University of Padova
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier: GPL-2.0-only
  *
  * Author: Davide Magrin <magrinda@dei.unipd.it>
  */
 
-#include "ns3/lora-tag.h"
-#include "ns3/tag.h"
-#include "ns3/uinteger.h"
+#include "lora-tag.h"
 
-namespace ns3 {
-namespace lorawan {
+namespace ns3
+{
+namespace lorawan
+{
 
-NS_OBJECT_ENSURE_REGISTERED (LoraTag);
+NS_OBJECT_ENSURE_REGISTERED(LoraTag);
 
 TypeId
-LoraTag::GetTypeId (void)
+LoraTag::GetTypeId()
 {
-  static TypeId tid = TypeId ("ns3::LoraTag")
-    .SetParent<Tag> ()
-    .SetGroupName ("lorawan")
-    .AddConstructor<LoraTag> ()
-  ;
-  return tid;
+    static TypeId tid =
+        TypeId("ns3::LoraTag").SetParent<Tag>().SetGroupName("lorawan").AddConstructor<LoraTag>();
+    return tid;
 }
 
 TypeId
-LoraTag::GetInstanceTypeId (void) const
+LoraTag::GetInstanceTypeId() const
 {
-  return GetTypeId ();
+    return GetTypeId();
 }
 
-LoraTag::LoraTag (uint8_t sf, uint8_t destroyedBy) :
-  m_sf (sf),
-  m_destroyedBy (destroyedBy),
-  m_receivePower (0),
-  m_dataRate (0),
-  m_frequency (0)
+LoraTag::LoraTag(uint8_t sf, uint8_t destroyedBy)
+    : m_sf(sf),
+      m_destroyedBy(destroyedBy),
+      m_receivePower(0),
+      m_dataRate(0),
+      m_frequencyHz(0)
 {
 }
 
-LoraTag::~LoraTag ()
+LoraTag::~LoraTag()
 {
 }
 
 uint32_t
-LoraTag::GetSerializedSize (void) const
+LoraTag::GetSerializedSize() const
 {
-  // Each datum about a SF is 1 byte + receivePower (the size of a double) +
-  // frequency (the size of a double)
-  return 3 + 2 * sizeof(double);
+    // Each datum about a spreading factor is 1 byte + receivePower (the size of a double) +
+    // frequency (4 bytes)
+    return 3 + sizeof(double) + 4;
 }
 
 void
-LoraTag::Serialize (TagBuffer i) const
+LoraTag::Serialize(TagBuffer i) const
 {
-  i.WriteU8 (m_sf);
-  i.WriteU8 (m_destroyedBy);
-  i.WriteDouble (m_receivePower);
-  i.WriteU8 (m_dataRate);
-  i.WriteDouble (m_frequency);
+    i.WriteU8(m_sf);
+    i.WriteU8(m_destroyedBy);
+    i.WriteDouble(m_receivePower);
+    i.WriteU8(m_dataRate);
+    i.WriteU32(m_frequencyHz);
 }
 
 void
-LoraTag::Deserialize (TagBuffer i)
+LoraTag::Deserialize(TagBuffer i)
 {
-  m_sf = i.ReadU8 ();
-  m_destroyedBy = i.ReadU8 ();
-  m_receivePower = i.ReadDouble ();
-  m_dataRate = i.ReadU8 ();
-  m_frequency = i.ReadDouble ();
+    m_sf = i.ReadU8();
+    m_destroyedBy = i.ReadU8();
+    m_receivePower = i.ReadDouble();
+    m_dataRate = i.ReadU8();
+    m_frequencyHz = i.ReadU32();
 }
 
 void
-LoraTag::Print (std::ostream &os) const
+LoraTag::Print(std::ostream& os) const
 {
-  os << m_sf << " " << m_destroyedBy << " " << m_receivePower << " " <<
-    m_dataRate;
+    os << m_sf << " " << m_destroyedBy << " " << m_receivePower << " " << m_dataRate;
 }
 
 uint8_t
-LoraTag::GetSpreadingFactor () const
+LoraTag::GetSpreadingFactor() const
 {
-  return m_sf;
+    return m_sf;
 }
 
 uint8_t
-LoraTag::GetDestroyedBy () const
+LoraTag::GetDestroyedBy() const
 {
-  return m_destroyedBy;
+    return m_destroyedBy;
 }
 
 double
-LoraTag::GetReceivePower () const
+LoraTag::GetReceivePower() const
 {
-  return m_receivePower;
+    return m_receivePower;
 }
 
 void
-LoraTag::SetDestroyedBy (uint8_t sf)
+LoraTag::SetDestroyedBy(uint8_t sf)
 {
-  m_destroyedBy = sf;
+    m_destroyedBy = sf;
 }
 
 void
-LoraTag::SetSpreadingFactor (uint8_t sf)
+LoraTag::SetSpreadingFactor(uint8_t sf)
 {
-  m_sf = sf;
+    m_sf = sf;
 }
 
 void
-LoraTag::SetReceivePower (double receivePower)
+LoraTag::SetReceivePower(double receivePower)
 {
-  m_receivePower = receivePower;
+    m_receivePower = receivePower;
 }
 
 void
-LoraTag::SetFrequency (double frequency)
+LoraTag::SetFrequency(uint32_t frequencyHz)
 {
-  m_frequency = frequency;
+    m_frequencyHz = frequencyHz;
 }
 
-double
-LoraTag::GetFrequency (void)
+uint32_t
+LoraTag::GetFrequency() const
 {
-  return m_frequency;
+    return m_frequencyHz;
 }
 
 uint8_t
-LoraTag::GetDataRate (void)
+LoraTag::GetDataRate() const
 {
-  return m_dataRate;
+    return m_dataRate;
 }
 
 void
-LoraTag::SetDataRate (uint8_t dataRate)
+LoraTag::SetDataRate(uint8_t dataRate)
 {
-  m_dataRate = dataRate;
+    m_dataRate = dataRate;
 }
 
-}
+} // namespace lorawan
 } // namespace ns3
